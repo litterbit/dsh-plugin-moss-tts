@@ -61,7 +61,7 @@
   "scripts": {
     "build": "node tools/build-client.mjs",
     "check": "node tools/build-client.mjs --check",
-    "test": "node --test tests/engine-install.test.mjs tests/routes.test.mjs tests/speech.test.mjs tests/tools.test.mjs && node --test tests/client-load.test.mjs && node tools/build-client.mjs --check",
+    "test": "node --test tests/engine-install.test.mjs tests/routes.test.mjs tests/speech.test.mjs tests/tools.test.mjs tests/playback.test.mjs && node --test tests/client-load.test.mjs && node tools/build-client.mjs --check",
     "test:e2e": "node --test tests/engine-protocol.test.mjs tests/host-e2e.test.mjs"
   }
 }

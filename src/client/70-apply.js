@@ -48,4 +48,10 @@ function apply(ctx) {
       ReadAction,
     ),
   )
+
+  // 测试钩子：只在 window.__MOSS_TTS_TEST__ 存在时挂内部对象（生产环境无副作用）。
+  // tests/playback.test.mjs 靠它把真播放器接到假 AudioContext 上跑逐样点回归。
+  if (typeof window !== 'undefined' && window.__MOSS_TTS_TEST__) {
+    Object.assign(window.__MOSS_TTS_TEST__, { player, prefsStore, statusStore, speakText, WORKLET_SOURCE })
+  }
 }
