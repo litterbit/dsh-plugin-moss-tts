@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: client bundle is up to date
+        run: node tools/build-client.mjs --check
+      - name: unit tests (no DSH, no engine)
+        run: node --test tests/engine-install.test.mjs tests/routes.test.mjs tests/speech.test.mjs tests/tools.test.mjs
+      - name: client bundle loads and registers its slots
+        run: node --test tests/client-load.test.mjs
+      - name: package contents
+        run: node tools/check-pack.mjs

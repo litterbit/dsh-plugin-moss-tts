@@ -1,0 +1,5 @@
+# dsh-plugin-moss-tts bundle: register the local MOSS-TTS engine, its HTTP
+# routes and the browser half (settings page, composer toggle, read-aloud).
+- insert:
+    - id: moss-tts
+      name: dsh-plugin-moss-tts

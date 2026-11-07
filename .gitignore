@@ -1,0 +1,7 @@
+# Build artifacts / local state
+node_modules/
+runs/
+*.log
+
+# Nothing else: lib/client.js is committed on purpose so a git install
+# needs no build step (a DSH market requirement).
