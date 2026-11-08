@@ -48,7 +48,10 @@ if (process.argv.includes('--check')) {
   } catch {
     current = ''
   }
-  if (current !== output) {
+  // 比的是"内容"，不是字节：Windows 上 core.autocrlf 会把检出变成 CRLF，
+  // 那不该算过期（CI 的 runner 就是这样，白白挂过两次）。
+  const same = current.replace(/\r\n/gu, '\n') === output
+  if (!same) {
     console.error('lib/client.js 不是最新的，运行：node tools/build-client.mjs')
     process.exit(1)
   }

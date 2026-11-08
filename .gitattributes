@@ -1,0 +1,5 @@
+# 统一用 LF 检出：lib/client.js 是生成产物，按字节比对的工具（build-client --check）
+# 不该因为 Windows 的 core.autocrlf 而误报过期。
+* text=auto eol=lf
+*.png binary
+*.zip binary
