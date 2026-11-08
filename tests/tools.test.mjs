@@ -11,19 +11,21 @@ const ROOT = path.resolve('runs', 'test-tools')
 function fakeCtx() {
   const tools = new Map()
   const effects = []
-  return {
+  const ctx = {
     tools: { register: (tool) => tools.set(tool.name, tool) },
     effect: (factory, label) => effects.push({ factory, label }),
     get: () => undefined,
+    inject: (deps, callback) => callback(ctx),
     logger: { info: () => {} },
     tools_: tools,
     effects,
   }
+  return ctx
 }
 
 test('apply 注册 5 个工具，形状符合宿主约定', async () => {
   const ctx = fakeCtx()
-  const service = apply(ctx, { root: ROOT, autoDownload: false })
+  apply(ctx, { root: ROOT, autoDownload: false })
   assert.equal(name, 'moss-tts')
   assert.equal(ctx.tools_.size, 5)
   assert.deepEqual(
@@ -43,7 +45,7 @@ test('apply 注册 5 个工具，形状符合宿主约定', async () => {
     const rendered = tool.output.render({}, sampleOutput(tool.name))
     assert.ok(Array.isArray(rendered) && typeof rendered[0].text === 'string')
   }
-  assert.equal(typeof service.dispose, 'function')
+  assert.equal(typeof ctx.effects[0].factory, 'function')
   const dispose = ctx.effects[0].factory()
   assert.equal(typeof dispose, 'function')
   await dispose()

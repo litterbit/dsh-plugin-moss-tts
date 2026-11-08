@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.1 — 2026-11-08
+
+装上就发现的三处硬伤，都是"只在真实宿主/真实网络里才会暴露"的那种：
+
+- **`apply` 返回了服务对象** → cordis 把返回值当成 effect，抛 `Invalid effect`，整个 fiber 失败、
+  刚注册的路由被拆掉，界面所有请求 404（设置页能看到，但点"下载引擎"只得到 `HTTP 404`）。
+  现在 `apply` 不返回值。
+- **`webServer` 竞态**：桌面端重载组合时插件可能比 Web 服务早一拍，改为 `ctx.inject(['webServer'])`，
+  服务晚到会自动补注册、服务消失自动注销。
+- **HTTP 客户端两处 bug**：`transport()` 对 `URL` 对象调 `startsWith`（每个请求都直接抛），
+  以及**不认系统代理**——Node 不读 Windows 的 Internet 设置，于是浏览器能打开 GitHub、插件却
+  `ECONNRESET`。现在按 `HTTPS_PROXY`/`HTTP_PROXY` 环境变量 → 注册表 `ProxyServer`（看 `ProxyEnable`）
+  的顺序取代理，用 CONNECT 隧道；直连不通的机器（本机就是）实测 166 MB 全量包 23 秒下完。
+- 顺手：`engineVersion()` 在发布包里读不到版本（`models/manifest.json` 只有 `min_engine_version`），
+  改为回落 `--version` 并按 exe 大小/时间缓存；"打开安装目录"先建目录再 `explorer`。
+
 ## 0.1.0 — 2026-11-08
 
 首次发布。

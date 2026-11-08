@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-moss-tts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local MOSS-TTS speech for DeepSeek Harness: offline CPU synthesis, auto-read of replies, one-click engine download",
   "type": "module",
   "license": "Apache-2.0",
@@ -61,7 +61,7 @@
   "scripts": {
     "build": "node tools/build-client.mjs",
     "check": "node tools/build-client.mjs --check",
-    "test": "node --test tests/engine-install.test.mjs tests/routes.test.mjs tests/speech.test.mjs tests/tools.test.mjs tests/playback.test.mjs && node --test tests/client-load.test.mjs && node tools/build-client.mjs --check",
+    "test": "node --test tests/engine-install.test.mjs tests/routes.test.mjs tests/speech.test.mjs tests/http.test.mjs tests/tools.test.mjs tests/playback.test.mjs && node --test tests/client-load.test.mjs && node tools/build-client.mjs --check",
     "test:e2e": "node --test tests/engine-protocol.test.mjs tests/host-e2e.test.mjs"
   }
 }

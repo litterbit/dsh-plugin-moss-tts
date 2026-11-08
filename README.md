@@ -28,14 +28,22 @@ Harness assistant reply ──► auto-read / per-message read button
 
 ## Install
 
+**Desktop app**: sidebar **Plugins** → **Add plugin** → paste
+
+```
+github:litterbit/dsh-plugin-moss-tts#main
+```
+
+**CLI profile** (a profile the desktop app does not own):
+
 ```bash
-dsh plugin --profile desktop add github:litterbit/dsh-plugin-moss-tts#main
+dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 ```
 
 **Restart DSH** afterwards. You get a "Moss Speech" settings page, a speaker toggle at the left
 of the composer, a read button on every assistant reply, and five `moss_tts_*` tools.
 
-> Installing from a local checkout: `dsh plugin --profile desktop add D:\path\to\dsh-plugin-moss-tts`
+> Installing from a local checkout: `dsh plugin --profile <name> add D:\path\to\dsh-plugin-moss-tts`
 > (an absolute path is required).
 
 ## First run: install the engine
@@ -47,6 +55,9 @@ release's `sha256sums.txt`, and extracts it into `%LOCALAPPDATA%\MossTTS`.
 
 - Already installed via the CLI or the web playground? It is reused; nothing is downloaded twice.
 - Downloads resume after an interruption; cancel removes only the partial file.
+- **Follows your system proxy**: `HTTPS_PROXY` / `HTTP_PROXY` first, then the Windows Internet
+  settings (`ProxyEnable` + `ProxyServer`, via a CONNECT tunnel). A machine whose browser can open
+  GitHub needs no extra configuration; set `NO_PROXY=*` to force direct connections.
 - Behind a blocked network, point `engineUrl` + `engineSha256` at a mirror in the plugin config,
   or set `autoDownload: false` and manage the install yourself.
 
@@ -83,9 +94,8 @@ one when that tag is gone, and always verifies the release's `sha256sums.txt`.
 
 ## Uninstall
 
-```bash
-dsh plugin --profile desktop remove dsh-plugin-moss-tts
-```
+In the desktop app, remove it from the sidebar **Plugins** page. For a CLI-managed profile:
+`dsh plugin --profile <name> remove dsh-plugin-moss-tts`.
 
 The weights are left in place (the CLI and the web playground still use them). Delete
 `%LOCALAPPDATA%\MossTTS` to remove them too.

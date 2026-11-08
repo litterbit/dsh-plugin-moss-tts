@@ -27,14 +27,25 @@ Harness 助手回复 ──► 自动朗读 / 每条回复的朗读键
 
 ## 安装
 
+**桌面版**：侧栏「插件」→「添加插件」→ 粘贴
+
+```
+github:litterbit/dsh-plugin-moss-tts#main
+```
+
+> 桌面版的 profile 由应用独占管理，`dsh plugin` 命令行会明确拒绝（`profile ... is managed
+> exclusively by the Electron application`），所以别用命令行装。
+
+**命令行 profile**（非 Electron 托管）：
+
 ```bash
-dsh plugin --profile desktop add github:litterbit/dsh-plugin-moss-tts#main
+dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 ```
 
 装完**重启 DSH**。插件会出现在设置里（「Moss 语音」），输入框左侧多一个喇叭开关，
 每条助手回复的操作栏多一个朗读键，工具表里多 5 个 `moss_tts_*` 工具。
 
-> 想先试本地目录：`dsh plugin --profile desktop add D:\path\to\dsh-plugin-moss-tts`
+> 想先试本地目录：`dsh plugin --profile <name> add D:\path\to\dsh-plugin-moss-tts`
 > （必须是绝对路径）。
 
 ## 第一次使用：装引擎
@@ -46,6 +57,9 @@ dsh plugin --profile desktop add github:litterbit/dsh-plugin-moss-tts#main
 
 - 已经用命令行或网页试听台装过？插件直接复用，不会重复下载。
 - 下载可以断点续传；取消只删半包。
+- **自动跟系统代理**：先看 `HTTPS_PROXY` / `HTTP_PROXY` 环境变量，没有就读 Windows 的
+  Internet 设置（`ProxyEnable` + `ProxyServer`，走 CONNECT 隧道）。所以"浏览器能打开 GitHub"
+  的机器不需要额外配置；想强制直连，设 `NO_PROXY=*` 或把代理关掉。
 - 连不上 GitHub 时，可以在 `cordis.patch.yml` 的 config 里换 `engineUrl` + `engineSha256`
   （例如镜像站），或用 `autoDownload: false` 完全手动管理。
 
@@ -81,9 +95,8 @@ dsh plugin --profile desktop add github:litterbit/dsh-plugin-moss-tts#main
 
 ## 卸载
 
-```bash
-dsh plugin --profile desktop remove dsh-plugin-moss-tts
-```
+桌面版在**侧栏「插件」**里卸载；命令行 profile（非 Electron 托管）也可以用
+`dsh plugin --profile <name> remove dsh-plugin-moss-tts`。
 
 插件不会删权重（命令行 / 网页试听台还在用）。要彻底清掉：删掉 `%LOCALAPPDATA%\MossTTS`。
 
