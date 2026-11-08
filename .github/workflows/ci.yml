@@ -13,11 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: client bundle is up to date
-        run: node tools/build-client.mjs --check
-      - name: unit tests (no DSH, no engine)
-        run: node --test tests/engine-install.test.mjs tests/routes.test.mjs tests/speech.test.mjs tests/tools.test.mjs tests/playback.test.mjs
-      - name: client bundle loads and registers its slots
-        run: node --test tests/client-load.test.mjs
-      - name: package contents
-        run: node tools/check-pack.mjs
+      # 步骤都写在 tools/ci.mjs 里：本地与 CI 完全一致，失败还会留一行
+      # ::error:: 注解（GitHub 的步骤失败本身不带任何原因）。
+      - name: tests
+        run: node tools/ci.mjs
