@@ -1,7 +1,9 @@
 // 路由层：起一个真的 http.Server，用真的 req/res 打真实请求。
 // 引擎是假的 —— 这里验的是协议、安全头和背压开关，不是合成质量。
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import http from 'node:http'
+import path from 'node:path'
 import test from 'node:test'
 
 import { registerRoutes } from '../lib/host/routes.mjs'
@@ -66,14 +68,18 @@ function fakeService(overrides = {}) {
       install: { phase: 'ready', downloaded: 0, total: 0 },
     }),
     ensureEngine: async () => fakeEngine(state),
-    voices: async () => ({ builtin: [{ id: 'Junhao' }], user: [] }),
+    voices: async () => ({ builtin: [{ id: 'Junhao' }], user: [], default: 'Junhao' }),
+    speak: async (options) => fakeEngine(state).speak(options),
+    recordJob: () => {},
+    dataDir: 'D:\\tmp\\MossTTS\\userdata',
+    lastJob: undefined,
     synthesize: async () => ({ pcm: Buffer.alloc(960), info: { audio_ms: 10, state: 'completed' } }),
     ...overrides,
   }
   return { service, state, prefs: () => prefs }
 }
 
-async function harness(service) {
+async function harness(service, options = {}) {
   const routes = new Map()
   const webServer = {
     register({ path, handler }) {
@@ -81,7 +87,7 @@ async function harness(service) {
       return () => routes.delete(path)
     },
   }
-  registerRoutes(webServer, service)
+  registerRoutes(webServer, service, options)
   const server = http.createServer((req, res) => {
     const pathname = new URL(req.url, 'http://127.0.0.1').pathname
     const handler = routes.get(pathname)
@@ -112,7 +118,8 @@ test('GET /status 返回状态与偏好', async () => {
     assert.equal(res.status, 200)
     const body = await res.json()
     assert.equal(body.state, 'ready')
-    assert.equal(body.prefs.voice, 'Junhao')
+    assert.equal(body.prefs.voice, '')
+    assert.equal(body.prefs.speakMode, 'smart')
     assert.equal(res.headers.get('cache-control'), 'no-store')
   } finally {
     await app.close()
@@ -186,7 +193,7 @@ test('POST /stream 返回 PCM 流与格式头', async () => {
   }
 })
 
-test('文本过长 → 413，不进引擎', async () => {
+test('超长文本：先按 4000 字截断，超过两倍才 413', async () => {
   const { service, state } = fakeService()
   const app = await harness(service)
   try {
@@ -195,8 +202,16 @@ test('文本过长 → 413，不进引擎', async () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text: '好'.repeat(4001) }),
     })
-    assert.equal(res.status, 413)
-    assert.equal(state.calls.length, 0)
+    assert.equal(res.status, 200)
+    assert.equal(state.calls.length, 1)
+    assert.ok(state.calls[0].text.length <= 4000)
+
+    const huge = await fetch(`${app.base}/moss-tts/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: '好'.repeat(9000) }),
+    })
+    assert.equal(huge.status, 413)
   } finally {
     await app.close()
   }
@@ -279,5 +294,148 @@ test('/voices 在引擎缺失时返回 installed:false 而不是报错', async (
     assert.deepEqual(body.builtin, [])
   } finally {
     await app.close()
+  }
+})
+﻿
+test('GET /last 返回最近一次耗时', async () => {
+  const job = { audio_ms: 5120, compute_ms: 764, first_pcm_ms: 128, rtf: 0.149 }
+  const { service } = fakeService({ lastJob: job })
+  const app = await harness(service)
+  try {
+    const body = await (await fetch(`${app.base}/moss-tts/last`)).json()
+    assert.deepEqual(body.job, job)
+  } finally {
+    await app.close()
+  }
+})
+
+test('POST /voices/clone 收 audio/wav，名字非法就 500 带原因', async () => {
+  const { service } = fakeService({
+    clone: async (name, bytes) => {
+      if (!/^[\w-]{1,32}$/u.test(name)) throw new Error('音色名只能是字母/数字/_/-，最长 32')
+      return { name, seconds: 12, trimmed: false, bytes: bytes.length }
+    },
+  })
+  const app = await harness(service)
+  try {
+    const ok = await fetch(`${app.base}/moss-tts/voices/clone?name=me`, {
+      method: 'POST',
+      headers: { 'content-type': 'audio/wav' },
+      body: Buffer.alloc(1024, 7),
+    })
+    assert.equal(ok.status, 200)
+    assert.equal((await ok.json()).name, 'me')
+
+    const bad = await fetch(`${app.base}/moss-tts/voices/clone?name=${encodeURIComponent('很长的名字!' + 'x'.repeat(40))}`, {
+      method: 'POST',
+      headers: { 'content-type': 'audio/wav' },
+      body: Buffer.alloc(16),
+    })
+    assert.equal(bad.status, 500)
+    assert.match((await bad.json()).error, /音色名/u)
+
+    const wrongType = await fetch(`${app.base}/moss-tts/voices/clone?name=me`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
+    assert.equal(wrongType.status, 415)
+  } finally {
+    await app.close()
+  }
+})
+
+test('POST /engine/* 走服务，且 POST 必须 JSON', async () => {
+  const calls = []
+  const { service } = fakeService({
+    restartEngine: async (patch) => {
+      calls.push(['restart', patch])
+      return { version: '0.1.2' }
+    },
+    stopEngine: async () => {
+      calls.push(['stop'])
+      return true
+    },
+    health: async () => {
+      calls.push(['health'])
+      return { ok: true, restarted: false, status: { state: 'ready' } }
+    },
+  })
+  const app = await harness(service)
+  try {
+    const restart = await fetch(`${app.base}/moss-tts/engine/restart`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ llmThreads: 2, decodeThreads: 3 }),
+    })
+    assert.equal(restart.status, 200)
+    assert.deepEqual(calls[0], ['restart', { llmThreads: 2, decodeThreads: 3 }])
+
+    const stop = await fetch(`${app.base}/moss-tts/engine/stop`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    assert.equal(stop.status, 200)
+    assert.deepEqual(calls[1], ['stop'])
+
+    const health = await fetch(`${app.base}/moss-tts/engine/health`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+    assert.equal(health.status, 200)
+    assert.deepEqual(calls[2], ['health'])
+
+    const wrong = await fetch(`${app.base}/moss-tts/engine/restart`, { method: 'POST', headers: { 'content-type': 'text/plain' }, body: 'x' })
+    assert.equal(wrong.status, 415)
+  } finally {
+    await app.close()
+  }
+})
+
+test('POST /summary 交给 announcer，空回答 400', async () => {  const seen = []
+  const announcer = {
+    announce: async (request) => {
+      seen.push(request)
+      return { text: '三步都做完了。', mode: 'llm', ms: 12 }
+    },
+  }
+  const { service } = fakeService()
+  const app = await harness(service, { announcer })
+  try {
+    const res = await fetch(`${app.base}/moss-tts/summary`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: 's1', messageId: 'm1', question: '做完了吗', answer: 'x'.repeat(200) }),
+    })
+    assert.equal(res.status, 200)
+    const body = await res.json()
+    assert.equal(body.text, '三步都做完了。')
+    assert.equal(seen[0].maxChars, 60)
+    assert.equal(seen[0].minChars, 80)
+
+    const empty = await fetch(`${app.base}/moss-tts/summary`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ answer: '  ' }),
+    })
+    assert.equal(empty.status, 400)
+  } finally {
+    await app.close()
+  }
+})
+
+test('用户克隆的音色自动用 scope=user', async () => {
+  const root = path.resolve('runs', 'test-routes')
+  const userDir = path.join(root, 'userdata', 'voices', 'user')
+  fs.mkdirSync(userDir, { recursive: true })
+  fs.writeFileSync(path.join(userDir, 'myclone.mossclone'), 'x')
+  const { service, state } = fakeService({ dataDir: path.join(root, 'userdata') })
+  const app = await harness(service)
+  try {
+    const res = await fetch(`${app.base}/moss-tts/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: '你好', voice: 'myclone' }),
+    })
+    assert.equal(res.status, 200)
+    assert.equal(state.calls[0].voice, 'myclone')
+    assert.equal(state.calls[0].scope, 'user')
+  } finally {
+    await app.close()
+    fs.rmSync(root, { recursive: true, force: true })
   }
 })

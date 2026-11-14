@@ -1,7 +1,7 @@
 {
   "name": "dsh-plugin-moss-tts",
-  "version": "0.1.1",
-  "description": "Local MOSS-TTS speech for DeepSeek Harness: offline CPU synthesis, auto-read of replies, one-click engine download",
+  "version": "0.2.0",
+  "description": "Local MOSS-TTS speech for DeepSeek Harness: offline CPU synthesis, three auto-read modes, voice lab and drag-and-drop cloning in settings",
   "type": "module",
   "license": "Apache-2.0",
   "author": "litterbit",

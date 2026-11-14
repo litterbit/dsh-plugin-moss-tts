@@ -91,3 +91,17 @@ test('Prefs 落盘后能读回，坏文件退默认', () => {
   fs.writeFileSync(file, '{ broken')
   assert.deepEqual(new Prefs(file).get(), { ...DEFAULT_PREFS })
 })
+
+test('0.1.x 的旧 prefs：升级后保持读全文，Junhao 退回引擎默认', () => {
+  const dir = path.resolve('runs', 'test-prefs-legacy')
+  fs.rmSync(dir, { recursive: true, force: true })
+  fs.mkdirSync(dir, { recursive: true })
+  const file = path.join(dir, 'prefs.json')
+  fs.writeFileSync(file, JSON.stringify({ voice: 'Junhao', autoRead: true, maxChars: 800, skipCode: true }))
+  const value = new Prefs(file).get()
+  assert.equal(value.speakMode, 'full')
+  assert.equal(value.voice, '')
+  assert.equal(value.autoRead, true)
+  assert.equal(value.maxChars, 800)
+  assert.equal(value.idleUnloadMinutes, DEFAULT_PREFS.idleUnloadMinutes)
+})

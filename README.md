@@ -1,6 +1,6 @@
 # dsh-plugin-moss-tts
 
-[简体中文](README.zh-CN.md) · Version **0.1.1** · Apache-2.0 · [Engine repo](https://github.com/litterbit/dsh-moss-tts)
+[简体中文](README.zh-CN.md) · Version **0.2.0** · Apache-2.0 · [Engine repo](https://github.com/litterbit/dsh-moss-tts)
 
 Local text-to-speech for DeepSeek Harness, powered by the MOSS-TTS-Nano-100M C++ CPU engine.
 Everything is synthesized on this machine; text never leaves it, and the weights are installed
@@ -67,15 +67,53 @@ release's `sha256sums.txt`, and extracts it into `%LOCALAPPDATA%\MossTTS`.
 
 | Entry point | What it does |
 |---|---|
-| 🔊 left of the composer | Auto-read. Reads each reply when it settles; while speaking the same button is ⏹ and stops it |
+| 🔊 left of the composer | Auto-read. Reads each reply when it settles, using the selected mode; while speaking the same button is ⏹ and stops it |
 | 🔊 on a reply | Reads that reply only (whole text, ignores the auto-read limit) |
-| Settings → Moss Speech | Voice, auto-read limit, skip code blocks, preview, engine state and paths |
-| `moss_tts_say` | Agent-initiated speech (plays locally, or `save_to` writes a WAV) |
-| `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | Voices / stop / clone a voice / engine status and install |
+| Settings → Moss Speech | Engine state/threads/restart, default voice, **voice lab** (type text, preview any voice), **drag-and-drop clone**, three read modes, diagnostics |
+| `moss_tts_say` | Agent-initiated speech (plays locally, or `save_to` writes a WAV); cloned voices are detected automatically |
+| `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | Voices (labels + default marker) / stop / clone (trims >20 s) / status, install, restart, unload |
 
 Markdown is cleaned before speaking: fenced code and tables are skipped, links keep their text,
 heading and list markers are stripped, and long replies are cut on a sentence boundary at the
 auto-read limit (default 1500 characters, 0 = unlimited).
+
+### Three read modes
+
+| Mode | What is spoken | Cost |
+|---|---|---|
+| **Smart summary** (default) | A DSH subagent condenses the turn into one sentence (≤60 chars); only 200 chars of the question and 600 chars of the answer are sent | A few k tokens per turn (the child's own system prompt); replies under 80 chars are read as-is |
+| **Full text** | The whole reply after cleaning (v0.1 behaviour) | Local compute only |
+| **Fixed line** | One editable sentence, e.g. "Task complete." | Almost free |
+
+If the summary fails (no subagent service, parent offline, timeout, error) it falls back to a
+local extract (first sentence, zero tokens) and then to the fixed line — so you always hear
+something. The child shows up in the subagent list as `moss-tts-summary`.
+
+### Cloning without the CLI
+
+The "Clone a voice" card is a drop zone: drop a WAV/MP3/M4A, the browser decodes it to 48 kHz with
+`OfflineAudioContext`, draws the waveform, lets you drag a 1–20 second window, preview it, name it,
+and create the voice. The file never leaves the machine — only the trimmed PCM WAV goes to the
+local engine.
+
+### Engine lifecycle and memory
+
+- Nothing is preloaded: DSH start-up only loads the host module and the settings script (tens of KB),
+  no engine process.
+- `moss_tts.exe` starts on the first synthesis / voice list / clone (~1–2 s to load weights,
+  ~250 MB resident afterwards).
+- After **10 idle minutes** the engine is unloaded and the memory returned; the next synthesis
+  starts it again. `preload: true` warms it at start-up, `idleUnloadMinutes: 0` never unloads.
+- To not load the plugin at all, turn `dsh-plugin-moss-tts` off on the sidebar **Plugins** page
+  (writes `disabled: true` into the profile patch); after a restart even the settings page is gone.
+
+### Threads
+
+The "Performance" card edits the two thread pools (LLM and decoder; 0 = auto, default 2+3) and
+applies them with **Save and restart engine**. Thread counts change speed and heat, never the
+audio, and land in the engine's own `%LOCALAPPDATA%\MossTTS\userdata\settings.json` so the CLI and
+the web playground see the same values.
+
 
 ## Privacy
 
@@ -110,6 +148,9 @@ The weights are left in place (the CLI and the web playground still use them). D
 | Download fails / hash mismatch | Usually a proxy rewriting the body. Retry once; if it persists, set `engineUrl` + `engineSha256` in the plugin config |
 | "Ready" but silent | The tab is muted, or the output device is wrong; click anywhere in the page once so the browser allows playback |
 | Long replies are cut short | The auto-read limit (1500 chars) — raise it in settings, or use the reply's own read button |
+| It keeps ~250 MB resident | The engine is a resident child; it unloads after 10 idle minutes, or press "Stop (free memory)", or lower `idleUnloadMinutes` |
+| Smart summary is not used | Check the diagnostics JSON or `[summary]` in `plugin.log`; without the subagent service it degrades to `extract` |
+| Thread changes do nothing | Press "Save and restart engine"; a stale value in `settings.json` is read back into the page first |
 | Plugin does not appear | DSH must be restarted; `dsh --profile desktop --dump-config` should contain a row `id: moss-tts` |
 
 ## Development
@@ -117,6 +158,7 @@ The weights are left in place (the CLI and the web playground still use them). D
 ```bash
 node tools/build-client.mjs          # regenerate lib/client.js (committed; installs run no build)
 node tools/build-client.mjs --check  # what CI uses to catch a stale bundle
+node tools/ci.mjs                    # the same gate GitHub Actions runs
 node --test tests/*.test.mjs         # no DSH required; engine tests skip without an engine
 ```
 

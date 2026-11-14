@@ -23,16 +23,17 @@ function fakeEngine(state) {
       const id = `s${(state.calls += 1)}`
       const job = { cancelled: false }
       state.jobs.push(job)
+      const total = state.chunks
       const done = new Promise((resolve) => {
         const run = async () => {
-          for (let i = 0; i < state.chunks; i++) {
+          for (let i = 0; i < total; i++) {
             if (job.cancelled) break
             const samples = new Int16Array(state.framesPerChunk * 2)
             for (let f = 0; f < samples.length; f++) samples[f] = (i + f) % 2000
             options.onAudio(Buffer.from(samples.buffer))
             await new Promise((resolve) => setTimeout(resolve, 1))
           }
-          resolve({ state: job.cancelled ? 'cancelled' : 'completed', audio_ms: state.chunks * 100 })
+          resolve({ state: job.cancelled ? 'cancelled' : 'completed', audio_ms: total * 100 })
         }
         run()
       })
@@ -52,6 +53,8 @@ async function startHost(state) {
     status: () => ({ state: 'ready', install: { phase: 'ready' }, prefs: {} }),
     ensureEngine: async () => fakeEngine(state),
     voices: async () => ({ builtin: [], user: [] }),
+    speak: async (options) => fakeEngine(state).speak(options),
+    recordJob: () => {},
     synthesize: async () => ({ pcm: Buffer.alloc(0), info: {} }),
   }
   const routes = new Map()
@@ -242,7 +245,7 @@ test('信用窗口下播放不丢样：played 等于送出的全部帧', { timeo
 })
 
 test('新朗读打断旧朗读：旧作业被取消，新的一段照常播完', { timeout: 60000 }, async () => {
-  const engineState = { calls: 0, jobs: [], chunks: 20, framesPerChunk: 4800 }
+  const engineState = { calls: 0, jobs: [], chunks: 300, framesPerChunk: 4800 }
   const host = await startHost(engineState)
   try {
     const { hooks, state } = loadClient(host.base)

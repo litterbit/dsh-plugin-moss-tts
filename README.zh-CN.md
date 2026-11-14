@@ -1,6 +1,6 @@
 # dsh-plugin-moss-tts
 
-[English](README.md) · 版本 **0.1.1** · Apache-2.0 · [引擎仓](https://github.com/litterbit/dsh-moss-tts)
+[English](README.md) · 版本 **0.2.0** · Apache-2.0 · [引擎仓](https://github.com/litterbit/dsh-moss-tts)
 
 给 DeepSeek Harness 用的**本地 TTS**插件：用 MOSS-TTS-Nano-100M 的 C++ CPU 引擎朗读助手回复。
 全部在本机计算，文本不出机器；权重只装一份，和命令行、网页试听台共用。
@@ -69,14 +69,47 @@ dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 
 | 入口 | 说明 |
 |---|---|
-| 输入框左侧 🔊 | 自动朗读开关。开着时，每条回复定稿后自动念；再点（朗读中变 ⏹）立刻停 |
+| 输入框左侧 🔊 | 自动朗读开关。开着时，每条回复定稿后按所选模式念；再点（朗读中变 ⏹）立刻停 |
 | 每条回复的 🔊 | 只念这一条。默认念全文，不受"自动朗读上限"影响 |
-| 设置 → Moss 语音 | 音色、语速（引擎默认采样参数）、自动朗读上限、跳过代码块、试听、引擎状态与路径 |
-| 工具 `moss_tts_say` | agent 主动朗读（本机播放，或 `save_to` 只落盘） |
-| 工具 `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | 音色列表 / 停止 / 克隆音色 / 引擎状态与安装 |
+| 设置 → Moss 语音 | 引擎状态/线程/重启、默认音色、**试听台**（填文本逐个音色试）、**拖入音频克隆音色**、三种朗读模式、诊断 |
+| 工具 `moss_tts_say` | agent 主动朗读（本机播放，或 `save_to` 只落盘）；克隆音色自动识别，不用再填 scope |
+| 工具 `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | 音色列表（带中文名与默认标记）/ 停止 / 克隆（>20 秒自动裁剪）/ 状态、安装、重启、卸载 |
 
 朗读前会清洗 Markdown：代码块和表格不念，链接只念文字，标题与列表符号去掉，
 按句末标点截断到「自动朗读上限」（默认 1500 字，0 = 不限）。
+
+### 三种朗读模式
+
+| 模式 | 念什么 | 代价 |
+|---|---|---|
+| **智能摘要**（默认） | 用 DSH 子代理把这一轮结果压成一句 ≤60 字的话；提问只取前 200 字、回答只取前 600 字 | 每次约几 k token（子代理的系统提示）；回复短于 80 字直接念，不调模型 |
+| **读全文** | 清洗后整段念（v0.1 的行为） | 只花本机算力 |
+| **固定语句** | 只念一句可自定义的话，例如「任务已经完成，请查收。」 | 几乎没有代价 |
+
+摘要失败（没装子代理服务、父会话不在线、超时、报错）会**自动退回本地抽取式摘要**（取第一句，
+0 token），再退回固定语句——所以开了就一定会有声音。子代理在会话里显示为 `moss-tts-summary`。
+
+### 克隆音色（不用命令行）
+
+设置页的「克隆音色」是一个拖放区：把 WAV/MP3/M4A 拖进去，浏览器用
+`OfflineAudioContext` 解码成 48 kHz，画出波形，拖动起点/终点选 1~20 秒，可以试听选段，
+起个名字就能创建。文件**不会上传**，只有裁剪后的 PCM WAV 会交给本机引擎。
+
+### 引擎生命周期与内存
+
+- 插件**默认不预热**：DSH 启动时只加载宿主模块与设置页脚本（几十 KB），不 spawn 引擎。
+- 第一次合成/读音色/克隆时才启动 `moss_tts.exe`（加载权重约 1~2 秒，常驻约 250 MB）。
+- 空闲 **10 分钟**会自动卸载引擎进程，把内存还回去；下次合成自动拉起。
+  `preload: true` 可以改成启动即预热，`idleUnloadMinutes: 0` 可以永不卸载。
+- 想**彻底不加载**插件：侧栏「插件」页把 `dsh-plugin-moss-tts` 关掉（写入 profile 的
+  `cordis.patch.yml`，`disabled: true`），重启 DSH 后连设置页都不会出现。
+
+### 线程数
+
+设置页「性能」里可以改 LLM / 解码器两个线程池（0 = 自动，默认 2+3），点「保存并重启引擎」生效。
+线程数只影响速度与发热，**不影响音频内容**；写入的是引擎自己的
+`%LOCALAPPDATA%\MossTTS\userdata\settings.json`，所以命令行和网页试听台看到的是同一个值。
+
 
 ## 隐私
 
@@ -110,6 +143,9 @@ dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 | 下载失败 / 校验不通过 | 多半是代理改写了内容。重试一次；仍然失败就在 config 里给 `engineUrl` + `engineSha256` 换源 |
 | 朗读没有声音但设置页显示就绪 | 浏览器标签页被静音或系统输出设备不对；点一下页面任意处让浏览器允许自动播放 |
 | 长回复只念了一部分 | 默认上限 1500 字，改设置里的「自动朗读上限」或点那条回复上的朗读键 |
+| 一直占着 250 MB 内存 | 引擎是常驻子进程；空闲 10 分钟会自动卸载，也可以点「停止（释放内存）」，或把 `idleUnloadMinutes` 设小 |
+| 智能摘要没生效 | 看诊断 JSON 或 `plugin.log` 里的 `[summary]`；没挂 subagent 服务时会是 `extract`（本地第一句） |
+| 线程数改了没变 | 必须点「保存并重启引擎」；`settings.json` 里残留的旧值会先被读回设置页 |
 | 提示引擎版本过旧 | 删掉 `%LOCALAPPDATA%\MossTTS\models` 后重新点下载，升级权重 |
 | 插件没出现 | 安装后必须重启 DSH；`dsh --profile desktop --dump-config` 里应能看到一行 `id: moss-tts` |
 
@@ -118,6 +154,7 @@ dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 ```bash
 node tools/build-client.mjs          # 生成 lib/client.js（产物进仓库，安装时不构建）
 node tools/build-client.mjs --check  # CI 用它拦"忘了重新生成"
+node tools/ci.mjs                    # 本地和 GitHub Actions 走同一条门禁
 node --test tests/*.test.mjs         # 不需要 DSH；真引擎的两个用例没有引擎会自动跳过
 ```
 

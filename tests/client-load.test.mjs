@@ -129,3 +129,38 @@ test('三个组件浅浅调用一次都不抛错', () => {
     assert.ok(element && typeof element === 'object', `${options.name} 应该返回元素`)
   }
 })
+
+test('设置页整棵树都能展开（含子组件），不出现 undefined', () => {
+  const { registry } = loadBundle()
+  const exports = [...registry.values()][0]((name) => {
+    if (name === 'react') return fakeReact()
+    throw new Error(`unexpected require: ${name}`)
+  })
+  const { ctx, registrations } = fakeCtx()
+  exports.apply(ctx)
+  const t = (key) => key
+  const settings = registrations.find((item) => item.options.name === 'settings.section')
+  const tree = settings.component({ t })
+
+  let nodes = 0
+  const seen = new WeakSet()
+  const walk = (node, depth) => {
+    if (node === null || node === undefined || typeof node !== 'object') return
+    if (seen.has(node)) return
+    seen.add(node)
+    assert.ok(depth < 30, '组件展开过深（可能有循环）')
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child, depth + 1)
+      return
+    }
+    nodes += 1
+    if (typeof node.type === 'function') {
+      // Card / VoiceLab / CloneCard / PerfCard / DiagCard ...
+      walk(node.type(node.props), depth + 1)
+      return
+    }
+    walk(node.props?.children, depth + 1)
+  }
+  walk(tree, 0)
+  assert.ok(nodes > 20, `应该展开出不少节点，实际 ${nodes}`)
+})

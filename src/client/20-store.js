@@ -2,7 +2,20 @@
 // 组件用 useState + subscribe，不依赖宿主内部状态库。
 const API = '/moss-tts'
 
-const DEFAULT_PREFS = { voice: 'Junhao', autoRead: false, maxChars: 1500, skipCode: true }
+const DEFAULT_PREFS = {
+  voice: '',
+  autoRead: false,
+  speakMode: 'smart',
+  cannedText: '任务已经完成，请查收。',
+  maxChars: 1500,
+  skipCode: true,
+  llmThreads: 0,
+  decodeThreads: 0,
+  idleUnloadMinutes: 10,
+  preload: false,
+  smartMinChars: 80,
+  smartMaxChars: 60,
+}
 
 async function readResponse(res) {
   const text = await res.text()
@@ -137,4 +150,10 @@ function formatBytes(value) {
   const bytes = Number(value ?? 0)
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 MB'
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+/** 最近一次作业的耗时行；没有就返回空串。 */
+function timingText(job) {
+  if (!job || !job.audio_ms) return ''
+  return `音频 ${(job.audio_ms / 1000).toFixed(2)} s · 计算 ${Math.round(job.compute_ms)} ms · 首音 ${Math.round(job.first_pcm_ms ?? 0)} ms · RTF ${(job.rtf ?? 0).toFixed(3)}`
 }

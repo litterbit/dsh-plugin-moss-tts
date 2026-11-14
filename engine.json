@@ -1,7 +1,7 @@
 {
   "repo": "litterbit/dsh-moss-tts",
-  "release": "v0.1.1",
+  "release": "v0.1.2",
   "asset": "MossTTS-win-x64-full.zip",
   "sums": "sha256sums.txt",
-  "minVersion": "0.1.0"
+  "minVersion": "0.1.2"
 }
