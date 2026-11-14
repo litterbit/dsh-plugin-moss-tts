@@ -71,7 +71,7 @@ function fakeCtx() {
   return { ctx, registrations, dictionaries }
 }
 
-test('bundle 能加载，并注册 3 个 slot', () => {
+test('bundle 能加载，并注册 4 个 slot', () => {
   const { registry } = loadBundle()
   assert.equal(registry.size, 1)
   const [id, factory] = [...registry.entries()][0]
@@ -87,12 +87,13 @@ test('bundle 能加载，并注册 3 个 slot', () => {
   const { ctx, registrations, dictionaries } = fakeCtx()
   exports.apply(ctx)
 
-  assert.equal(registrations.length, 3)
+  assert.equal(registrations.length, 4)
   const byName = new Map(registrations.map((item) => [item.options.name, item]))
   assert.ok(byName.has('settings.section'))
   assert.equal(byName.get('settings.section').options.id, 'moss-tts')
   assert.equal(byName.get('conversation.input.left').options.id, 'moss-tts')
   assert.equal(byName.get('conversation.chat.assistant-actions').options.id, 'moss-tts-read')
+  assert.equal(byName.get('conversation.input.overlay').options.id, 'moss-tts-player')
   for (const item of registrations) {
     assert.equal(typeof item.component, 'function')
     assert.equal(item.options.locale, 'moss-tts')
@@ -109,7 +110,7 @@ test('bundle 能加载，并注册 3 个 slot', () => {
   assert.equal(label(), 'Moss 语音')
 })
 
-test('三个组件浅浅调用一次都不抛错', () => {
+test('四个组件浅浅调用一次都不抛错', () => {
   const { registry } = loadBundle()
   const exports = [...registry.values()][0]((name) => {
     if (name === 'react') return fakeReact()

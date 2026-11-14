@@ -120,6 +120,20 @@ function loadClient(base) {
   const blobs = new Map()
   const state = { worklet: undefined, node: undefined }
   const hooks = {}
+  const sources = []
+
+  class FakeEventSource {
+    constructor(url) {
+      this.url = url
+      this.onmessage = null
+      this.onerror = null
+      sources.push(this)
+    }
+    emit(data) {
+      this.onmessage?.({ data: JSON.stringify(data) })
+    }
+    close() {}
+  }
 
   class FakeAudioContext {
     constructor() {
@@ -147,6 +161,7 @@ function loadClient(base) {
         postMessage: (message) => {
           if (message.type === 'push') state.worklet.instance.port.onmessage({ data: { type: 'push', samples: message.samples } })
           else if (message.type === 'end') state.worklet.instance.port.onmessage({ data: { type: 'end' } })
+          else if (message.type === 'pause') state.worklet.instance.port.onmessage({ data: { type: 'pause', value: message.value } })
           else if (message.type === 'reset') state.worklet.instance.port.onmessage({ data: { type: 'reset' } })
         },
       }
@@ -159,6 +174,7 @@ function loadClient(base) {
   const context = {
     window: {
       AudioContext: FakeAudioContext,
+      EventSource: FakeEventSource,
       __MOSS_TTS_TEST__: hooks,
       __ModuleLoader__: { load: (entry) => registry.set(entry.id, entry.factory) },
     },
@@ -202,8 +218,8 @@ function loadClient(base) {
     locale: { register: () => () => {}, bind: () => (key) => key },
     slots: { inject: (_name, register) => register(), register: (options, component) => registered.push({ options, component }) },
   })
-  assert.equal(registered.length, 3)
-  return { hooks, state }
+  assert.equal(registered.length, 4)
+  return { hooks, state, sources }
 }
 
 function tick(worklet, frames) {
@@ -244,8 +260,7 @@ test('信用窗口下播放不丢样：played 等于送出的全部帧', { timeo
   }
 })
 
-test('新朗读打断旧朗读：旧作业被取消，新的一段照常播完', { timeout: 60000 }, async () => {
-  const engineState = { calls: 0, jobs: [], chunks: 300, framesPerChunk: 4800 }
+test('新朗读打断旧朗读：旧作业被取消，新的一段照常播完', { timeout: 60000 }, async () => {  const engineState = { calls: 0, jobs: [], chunks: 300, framesPerChunk: 4800 }
   const host = await startHost(engineState)
   try {
     const { hooks, state } = loadClient(host.base)
@@ -266,6 +281,95 @@ test('新朗读打断旧朗读：旧作业被取消，新的一段照常播完',
     assert.equal(engineState.jobs[0].cancelled, true, '第一个作业应被取消')
     assert.ok(state.worklet.instance.played > 0)
     assert.equal(hooks.player.snapshot.state, 'idle')
+  } finally {
+    await host.close()
+  }
+})
+
+test('暂停冻结播放、继续播完、重播不再调引擎；播放条给三个控制键', { timeout: 60000 }, async () => {
+  const engineState = { calls: 0, jobs: [], chunks: 20, framesPerChunk: 4800 }
+  const host = await startHost(engineState)
+  try {
+    const { hooks, state } = loadClient(host.base)
+    const total = engineState.chunks * engineState.framesPerChunk
+    const done = hooks.player.speak({ text: '暂停与重播。' })
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    tick(state.worklet, 4800)
+    hooks.player.pause()
+    const frozen = state.worklet.instance.played
+    tick(state.worklet, 9600)
+    assert.equal(state.worklet.instance.played, frozen, '暂停时不应继续消耗缓冲')
+    assert.equal(hooks.player.snapshot.paused, true)
+
+    // 播放条：暂停时是"继续 / 重播 / 停止"
+    const icons = []
+    const walk = (node) => {
+      if (!node || typeof node !== 'object') return
+      if (Array.isArray(node)) {
+        for (const child of node) walk(child)
+        return
+      }
+      if (typeof node.type === 'function' && node.type.name === 'PlayerIcon') icons.push(node.props.title)
+      walk(node.props?.children)
+    }
+    walk(hooks.PlayerBar({ t: (key) => key }))
+    assert.deepEqual(icons, ['player.resume', 'player.replay', 'player.stop'])
+
+    hooks.player.resume()
+    assert.notEqual(hooks.player.snapshot.state, 'paused')
+    const timer = setInterval(() => {
+      if (state.worklet && hooks.player.snapshot.state !== 'idle') tick(state.worklet, 5120)
+    }, 2)
+    try {
+      await done
+      for (let i = 0; i < 300 && hooks.player.snapshot.state !== 'idle'; i++) await new Promise((r) => setTimeout(r, 20))
+    } finally {
+      clearInterval(timer)
+    }
+    assert.equal(hooks.player.snapshot.state, 'idle')
+    assert.equal(state.worklet.instance.played, total, '应播满')
+
+    // 重播：本地留着 PCM，不再触发引擎
+    const calls = engineState.calls
+    const replay = hooks.player.replay()
+    const timer2 = setInterval(() => {
+      if (state.worklet && hooks.player.snapshot.state !== 'idle') tick(state.worklet, 5120)
+    }, 2)
+    try {
+      await replay
+      for (let i = 0; i < 300 && hooks.player.snapshot.state !== 'idle'; i++) await new Promise((r) => setTimeout(r, 20))
+    } finally {
+      clearInterval(timer2)
+    }
+    assert.equal(engineState.calls, calls, '重播不应重新调用引擎')
+    assert.equal(state.worklet.instance.played, total, '重播应从头播满')
+  } finally {
+    await host.close()
+  }
+})
+
+test('SSE 收到 say 就开播，stop 事件能停下', { timeout: 60000 }, async () => {
+  const engineState = { calls: 0, jobs: [], chunks: 40, framesPerChunk: 4800 }
+  const host = await startHost(engineState)
+  try {
+    const { hooks, state, sources } = loadClient(host.base)
+    assert.equal(sources.length, 1, '加载后应连一条事件流')
+    assert.equal(sources[0].url, '/moss-tts/events')
+    const timer = setInterval(() => {
+      if (state.worklet && hooks.player.snapshot.state !== 'idle') tick(state.worklet, 5120)
+    }, 2)
+    try {
+      sources[0].emit({ type: 'say', id: 'j1', text: '事件流播放。', voice: 'manqu', maxChars: 0 })
+      for (let i = 0; i < 300 && hooks.player.snapshot.state !== 'speaking'; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      assert.equal(hooks.player.snapshot.state, 'speaking')
+      assert.equal(engineState.calls, 1)
+      sources[0].emit({ type: 'stop' })
+      assert.equal(hooks.player.snapshot.state, 'idle')
+    } finally {
+      clearInterval(timer)
+    }
   } finally {
     await host.close()
   }

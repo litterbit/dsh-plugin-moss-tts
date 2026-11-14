@@ -1,6 +1,6 @@
 # dsh-plugin-moss-tts
 
-[简体中文](README.zh-CN.md) · Version **0.2.0** · Apache-2.0 · [Engine repo](https://github.com/litterbit/dsh-moss-tts)
+[简体中文](README.zh-CN.md) · Version **0.2.3** · Apache-2.0 · [Engine repo](https://github.com/litterbit/dsh-moss-tts)
 
 Local text-to-speech for DeepSeek Harness, powered by the MOSS-TTS-Nano-100M C++ CPU engine.
 Everything is synthesized on this machine; text never leaves it, and the weights are installed
@@ -18,6 +18,9 @@ Harness assistant reply ──► auto-read / per-message read button
                  moss_tts.exe --stdio (resident, weights loaded once)
                                  │
             browser AudioWorklet ring buffer ──► speakers
+
+agent calls moss_tts_say ──► host writes one event (GET /moss-tts/events, SSE) ──► browser
+                              the tool returns at once; the browser pulls /stream itself
 ```
 
 ## Requirements
@@ -67,15 +70,30 @@ release's `sha256sums.txt`, and extracts it into `%LOCALAPPDATA%\MossTTS`.
 
 | Entry point | What it does |
 |---|---|
-| 🔊 left of the composer | Auto-read. Reads each reply when it settles, using the selected mode; while speaking the same button is ⏹ and stops it |
+| 🔊 left of the composer | Auto-read. Reads each reply when it settles, using the selected mode; as soon as anything is audible it becomes ⏹ and stops it |
 | 🔊 on a reply | Reads that reply only (whole text, ignores the auto-read limit) |
+| Player bar above the composer | Appears while there is sound: pause/resume, ↻ replay, ⏹ stop, progress and elapsed time. Hides itself when playback ends |
 | Settings → Moss Speech | Engine state/threads/restart, default voice, **voice lab** (type text, preview any voice), **drag-and-drop clone**, three read modes, **volume**, diagnostics |
-| `moss_tts_say` | Agent-initiated speech: returns as soon as playback starts (`wait: true` to block until it ends), so the agent can keep working; `save_to` only writes the WAV; cloned voices are detected automatically |
-| `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | Voices (labels + default marker) / stop / clone (trims >20 s) / status, install, restart, unload |
+| `moss_tts_say` | Agent-initiated speech: with a browser attached it just hands the text over and **returns in milliseconds**; the UI synthesizes as it plays (first audio in ~0.2–0.4 s). `wait: true` waits for the end; `save_to` only writes the WAV |
+| `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | Voices (labels + default marker) / stop (including UI playback) / clone (trims >20 s) / status, install, restart, unload |
 
 Markdown is cleaned before speaking: fenced code and tables are skipped, links keep their text,
 heading and list markers are stripped, and long replies are cut on a sentence boundary at the
 auto-read limit (default 1500 characters, 0 = unlimited).
+
+### Playback controls
+
+Tools, auto-read and the per-reply button all share **one player**, so the controls are the same
+everywhere:
+
+- **Pause/resume** stops the AudioWorklet from consuming the ring buffer (it does not mute), so the
+  rest stays buffered. While paused the host stops reading the socket and the engine idles instead
+  of burning CPU.
+- **Replay** reuses the raw PCM the browser kept for the current clip (up to 5 minutes), so ↻
+  restarts instantly without synthesizing again; longer clips fall back to a fresh synthesis.
+- **Stop** aborts the download and clears the buffer. The `moss_tts_stop` tool also stops UI
+  playback.
+- A new clip takes over from the previous one (the engine is a single worker anyway).
 
 ### Three read modes
 

@@ -136,18 +136,18 @@ function ComposerToggle(props) {
 
   const ready = statusReady(status)
   const speaking = playback.state !== 'idle'
-  const autoSpeaking = speaking && playback.source === 'auto'
   const modeLabel = t(`composer.mode.${prefs.speakMode || 'full'}`)
   const title = !ready
     ? t('composer.notReady')
-    : autoSpeaking
+    : speaking
       ? t('composer.stop')
       : prefs.autoRead
         ? `${t('composer.autoReadOn')} · ${modeLabel}`
         : t('composer.autoReadOff')
 
   const onClick = () => {
-    if (autoSpeaking) {
+    // 有声（不管是工具读的、自动朗读还是手动读的）时就当停止键用
+    if (speaking) {
       player.stop()
       return
     }
@@ -159,7 +159,7 @@ function ComposerToggle(props) {
     {
       type: 'button',
       title: error ? `${title} · ${error}` : title,
-      'aria-pressed': autoSpeaking ? true : prefs.autoRead,
+      'aria-pressed': speaking ? true : prefs.autoRead,
       onClick,
       style: {
         ...ui.button,
@@ -169,10 +169,10 @@ function ComposerToggle(props) {
         alignItems: 'center',
         gap: '6px',
         opacity: ready ? 1 : 0.65,
-        borderColor: autoSpeaking ? 'var(--dsw-alias-state-business-primary, #4c6ef5)' : undefined,
+        borderColor: speaking ? 'var(--dsw-alias-state-business-primary, #4c6ef5)' : undefined,
       },
     },
-    react.createElement('span', { 'aria-hidden': true }, autoSpeaking ? '⏹' : prefs.autoRead ? '🔊' : '🔇'),
+    react.createElement('span', { 'aria-hidden': true }, speaking ? '⏹' : prefs.autoRead ? '🔊' : '🔇'),
     ready ? null : react.createElement(StateDot, { state: status.state, title }),
   )
 }

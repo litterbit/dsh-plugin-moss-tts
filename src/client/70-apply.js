@@ -11,6 +11,8 @@ function apply(ctx) {
   }
   // 提前拉一次偏好：输入框开关第一帧就是正确状态，不会闪一下。
   prefsStore.load()
+  // 工具说"放这段话"时，事件从这里进来（边合成边播，工具立刻返回）。
+  connectEvents()
 
   ctx.slots.inject('settings.section', () =>
     ctx.slots.register(
@@ -49,9 +51,22 @@ function apply(ctx) {
     ),
   )
 
+  ctx.slots.inject('conversation.input.overlay', () =>
+    ctx.slots.register(
+      {
+        name: 'conversation.input.overlay',
+        id: 'moss-tts-player',
+        order: 20,
+        locale: NS,
+      },
+      // overlay 的 slot props 不保证带 t，这里直接用 apply 里绑好的那份
+      () => react.createElement(PlayerBar, { t }),
+    ),
+  )
+
   // 测试钩子：只在 window.__MOSS_TTS_TEST__ 存在时挂内部对象（生产环境无副作用）。
   // tests/playback.test.mjs 靠它把真播放器接到假 AudioContext 上跑逐样点回归。
   if (typeof window !== 'undefined' && window.__MOSS_TTS_TEST__) {
-    Object.assign(window.__MOSS_TTS_TEST__, { player, prefsStore, statusStore, speakText, WORKLET_SOURCE })
+    Object.assign(window.__MOSS_TTS_TEST__, { player, prefsStore, statusStore, speakText, WORKLET_SOURCE, PlayerBar })
   }
 }

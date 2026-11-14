@@ -7,6 +7,8 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { registerRoutes } from '../lib/host/routes.mjs'
+import { createEventHub } from '../lib/host/events.mjs'
+import { createPlayback } from '../lib/host/playback.mjs'
 import { DEFAULT_PREFS, normalizePrefs } from '../lib/host/prefs.mjs'
 
 function fakeEngine(state) {
@@ -111,6 +113,60 @@ async function harness(service, options = {}) {
   const base = `http://127.0.0.1:${server.address().port}`
   return { base, close: () => new Promise((resolve) => server.close(resolve)) }
 }
+
+test('GET /events 收得到事件；/player 记住浏览器上报的播放状态', { timeout: 20000 }, async () => {
+  const { service } = fakeService()
+  const events = createEventHub({ heartbeatMs: 60000 })
+  const playback = createPlayback()
+  const app = await harness(service, { events, playback })
+  try {
+    const res = await fetch(`${app.base}/moss-tts/events`, { headers: { accept: 'text/event-stream' } })
+    assert.equal(res.status, 200)
+    assert.match(res.headers.get('content-type'), /text\/event-stream/u)
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    const read = async (pattern) => {
+      let text = ''
+      for (let i = 0; i < 20; i++) {
+        const { value, done } = await reader.read()
+        if (done) break
+        text += decoder.decode(value)
+        if (!pattern || pattern.test(text)) return text
+      }
+      return text
+    }
+    await read(/moss-tts/u)
+    events.send({ type: 'say', id: 'a1', text: '你好，世界。', voice: 'manqu', maxChars: 0 })
+    const said = await read(/"type":"say"/u)
+    assert.match(said, /"type":"say"/u)
+    assert.match(said, /"text":"你好，世界。"/u)
+
+    const posted = await fetch(`${app.base}/moss-tts/player`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 'a1', state: 'speaking', played: 96000, total: 192000 }),
+    })
+    assert.equal(posted.status, 200)
+    const current = await (await fetch(`${app.base}/moss-tts/player`)).json()
+    assert.equal(current.playback.state, 'speaking')
+    assert.equal(current.playback.played, 2)
+    assert.equal(current.playback.total, 4)
+    assert.equal(current.clients, 1)
+
+    // 迟到的旧作业状态不能盖掉当前这一段
+    await fetch(`${app.base}/moss-tts/player`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: 'old', state: 'stopped' }),
+    })
+    assert.equal(playback.snapshot().state, 'speaking')
+
+    reader.cancel().catch(() => {})
+  } finally {
+    events.closeAll()
+    await app.close()
+  }
+})
 
 test('GET /status 返回状态与偏好', async () => {
   const { service } = fakeService()

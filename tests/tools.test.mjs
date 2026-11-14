@@ -5,6 +5,8 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { apply, name } from '../lib/index.mjs'
+import { createPlayback } from '../lib/host/playback.mjs'
+import { registerTools } from '../lib/host/tools.mjs'
 
 const ROOT = path.resolve('runs', 'test-tools')
 
@@ -85,3 +87,79 @@ function sampleOutput(name) {
   if (name === 'moss_tts_engine') return { state: 'ready', version: '0.1.1', exe: 'x.exe', models: 'm' }
   return { detail: 'ok' }
 }
+
+/** 只够 moss_tts_say / moss_tts_stop 用的最小 service：合成一律算失败。 */
+function sayService(overrides = {}) {
+  return {
+    root: ROOT,
+    dataDir: path.join(ROOT, 'userdata'),
+    log: () => {},
+    prefs: { get: () => ({ voice: '', maxChars: 1500, skipCode: true, volume: 0.6 }) },
+    status: () => ({ state: 'ready', platform: 'win32' }),
+    stop: async () => false,
+    synthesizeToFile: async () => {
+      throw new Error('浏览器在线时不该落盘合成')
+    },
+    ...overrides,
+  }
+}
+
+function registerFakeTools(service, options) {
+  const tools = new Map()
+  registerTools({ tools: { register: (tool) => tools.set(tool.name, tool) } }, service, options)
+  return tools
+}
+
+test('moss_tts_say 有浏览器时不合成、立刻返回，并把文本丢进事件流', async () => {
+  const sent = []
+  const events = {
+    size: 1,
+    send(event) {
+      sent.push(event)
+      return 1
+    },
+  }
+  const playback = createPlayback()
+  const tools = registerFakeTools(sayService(), { events, playback })
+
+  const started = Date.now()
+  const out = await tools.get('moss_tts_say').execute({ text: '**你好**，世界。' })
+  const spent = Date.now() - started
+
+  assert.ok(spent < 100, `应该立刻返回，实际 ${spent} ms`)
+  assert.equal(out.mode, 'stream')
+  assert.equal(out.started, true)
+  assert.equal(out.background, true)
+  assert.equal(sent.length, 1)
+  assert.equal(sent[0].type, 'say')
+  assert.equal(sent[0].text, '你好，世界。')
+  assert.equal(sent[0].maxChars, 0)
+  assert.equal(playback.snapshot().state, 'starting')
+  assert.match(tools.get('moss_tts_say').output.render({}, out)[0].text, /已开始播放/u)
+})
+
+test('wait=true 等浏览器报播完；moss_tts_stop 会发 stop 事件', async () => {
+  const sent = []
+  const events = {
+    size: 1,
+    send(event) {
+      sent.push(event)
+      return 1
+    },
+  }
+  const playback = createPlayback()
+  const tools = registerFakeTools(sayService(), { events, playback })
+
+  const waiting = tools.get('moss_tts_say').execute({ text: '等它读完。', wait: true })
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  const id = sent[0].id
+  playback.update({ id, state: 'speaking', played: 48000, total: 96000 })
+  playback.update({ id, state: 'done', played: 96000, total: 96000 })
+  const out = await waiting
+  assert.equal(out.background, false)
+  assert.equal(out.seconds, 2)
+
+  const stopped = await tools.get('moss_tts_stop').execute({})
+  assert.equal(sent.at(-1).type, 'stop')
+  assert.match(stopped.detail, /停止/u)
+})
