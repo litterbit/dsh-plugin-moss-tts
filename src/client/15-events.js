@@ -11,7 +11,13 @@ function connectEvents() {
   if (eventSource) return
   const Ctor = window.EventSource ?? (typeof EventSource === 'function' ? EventSource : undefined)
   if (!Ctor) return
-  eventSource = new Ctor(`${API}/events`)
+  try {
+    eventSource = new Ctor(`${API}/events`)
+  } catch {
+    // CSP 或老浏览器不允许 SSE：退回"只有宿主自己播"的老路，别拖垮整个客户端
+    eventSource = undefined
+    return
+  }
   eventSource.onmessage = (event) => {
     let data
     try {
