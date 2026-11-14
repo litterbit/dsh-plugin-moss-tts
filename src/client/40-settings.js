@@ -201,6 +201,21 @@ function AutoReadCard(props) {
       onChange: (checked) => setPrefs({ skipCode: checked }),
       label: t('settings.skipCode'),
     }),
+    react.createElement(
+      Field,
+      { label: t('settings.volume') },
+      react.createElement('input', {
+        type: 'range',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        value: prefs.volume ?? 0.6,
+        onChange: (event) => setPrefs({ volume: Number(event.target.value) }),
+        style: { width: '180px' },
+      }),
+      react.createElement('span', { style: ui.label }, `${Math.round((prefs.volume ?? 0.6) * 100)}%`),
+    ),
+    react.createElement('div', { style: ui.label }, t('settings.volumeHint')),
     playback.error ? react.createElement('div', { style: { ...ui.label, color: '#e03131' } }, playback.error) : null,
     playback.dropped || playback.underruns
       ? react.createElement('div', { style: ui.label }, `丢样 ${playback.dropped} · 欠载 ${playback.underruns}`)

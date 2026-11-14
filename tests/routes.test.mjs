@@ -42,10 +42,12 @@ function fakeEngine(state) {
 function fakeService(overrides = {}) {
   let prefs = { ...DEFAULT_PREFS }
   const state = { calls: [], paused: 0, resumed: 0, cancelled: false, chunks: [Buffer.alloc(4800)], delay: 1 }
+  const engine = fakeEngine(state)
   const service = {
     root: 'D:\\tmp\\MossTTS',
     config: {},
     log: () => {},
+    engine,
     prefs: {
       get: () => prefs,
       update: (patch) => {
@@ -67,9 +69,9 @@ function fakeService(overrides = {}) {
       prefs,
       install: { phase: 'ready', downloaded: 0, total: 0 },
     }),
-    ensureEngine: async () => fakeEngine(state),
+    ensureEngine: async () => engine,
     voices: async () => ({ builtin: [{ id: 'Junhao' }], user: [], default: 'Junhao' }),
-    speak: async (options) => fakeEngine(state).speak(options),
+    speak: async (options) => engine.speak(options),
     recordJob: () => {},
     dataDir: 'D:\\tmp\\MossTTS\\userdata',
     lastJob: undefined,
@@ -257,6 +259,8 @@ test('客户端中断 → 引擎作业被取消', async () => {
     }
     await new Promise((resolve) => setTimeout(resolve, 200))
     assert.equal(state.cancelled, true)
+    // 中断后必须把引擎 stdout 放出来，否则下一次 voices/speak 会永远卡住
+    assert.ok(state.resumed > 0)
   } finally {
     await app.close()
   }

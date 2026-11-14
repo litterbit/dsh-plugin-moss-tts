@@ -71,7 +71,7 @@ dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 |---|---|
 | 输入框左侧 🔊 | 自动朗读开关。开着时，每条回复定稿后按所选模式念；再点（朗读中变 ⏹）立刻停 |
 | 每条回复的 🔊 | 只念这一条。默认念全文，不受"自动朗读上限"影响 |
-| 设置 → Moss 语音 | 引擎状态/线程/重启、默认音色、**试听台**（填文本逐个音色试）、**拖入音频克隆音色**、三种朗读模式、诊断 |
+| 设置 → Moss 语音 | 引擎状态/线程/重启、默认音色、**试听台**（填文本逐个音色试）、**拖入音频克隆音色**、三种朗读模式、**音量**、诊断 |
 | 工具 `moss_tts_say` | agent 主动朗读（本机播放，或 `save_to` 只落盘）；克隆音色自动识别，不用再填 scope |
 | 工具 `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | 音色列表（带中文名与默认标记）/ 停止 / 克隆（>20 秒自动裁剪）/ 状态、安装、重启、卸载 |
 
@@ -145,6 +145,8 @@ dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 | 长回复只念了一部分 | 默认上限 1500 字，改设置里的「自动朗读上限」或点那条回复上的朗读键 |
 | 一直占着 250 MB 内存 | 引擎是常驻子进程；空闲 10 分钟会自动卸载，也可以点「停止（释放内存）」，或把 `idleUnloadMinutes` 设小 |
 | 智能摘要没生效 | 看诊断 JSON 或 `plugin.log` 里的 `[summary]`；没挂 subagent 服务时会是 `extract`（本地第一句） |
+| 声音比别的应用响 | 设置页「音量」滑到 50%~70%（默认 60%）；网页播放与本机工具播放都生效 |
+| 工具调用一直不返回 | 0.2.1 修了中断后引擎 stdout 卡死；升级后重启 DSH 即可 |
 | 线程数改了没变 | 必须点「保存并重启引擎」；`settings.json` 里残留的旧值会先被读回设置页 |
 | 提示引擎版本过旧 | 删掉 `%LOCALAPPDATA%\MossTTS\models` 后重新点下载，升级权重 |
 | 插件没出现 | 安装后必须重启 DSH；`dsh --profile desktop --dump-config` 里应能看到一行 `id: moss-tts` |

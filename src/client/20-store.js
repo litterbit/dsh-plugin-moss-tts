@@ -9,6 +9,7 @@ const DEFAULT_PREFS = {
   cannedText: '任务已经完成，请查收。',
   maxChars: 1500,
   skipCode: true,
+  volume: 0.6,
   llmThreads: 0,
   decodeThreads: 0,
   idleUnloadMinutes: 10,

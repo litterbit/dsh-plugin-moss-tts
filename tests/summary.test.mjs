@@ -61,7 +61,7 @@ test('子代理成功：截断输入、返回一句话、同 messageId 命中缓
   assert.equal(seen.length, 1)
   assert.equal(seen[0].provider, 'spawn')
   assert.equal(seen[0].delivery, 'caller')
-  assert.equal(seen[0].request.maxDepth, 0)
+  assert.equal(seen[0].request.maxDepth, 1)
   assert.ok(seen[0].request.prompt.length < 1200)
   assert.ok(seen[0].request.prompt.includes('用户：'))
   assert.ok(seen[0].request.prompt.length < SUMMARY_QUESTION_CHARS + SUMMARY_ANSWER_CHARS + 400)

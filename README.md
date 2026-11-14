@@ -69,7 +69,7 @@ release's `sha256sums.txt`, and extracts it into `%LOCALAPPDATA%\MossTTS`.
 |---|---|
 | 🔊 left of the composer | Auto-read. Reads each reply when it settles, using the selected mode; while speaking the same button is ⏹ and stops it |
 | 🔊 on a reply | Reads that reply only (whole text, ignores the auto-read limit) |
-| Settings → Moss Speech | Engine state/threads/restart, default voice, **voice lab** (type text, preview any voice), **drag-and-drop clone**, three read modes, diagnostics |
+| Settings → Moss Speech | Engine state/threads/restart, default voice, **voice lab** (type text, preview any voice), **drag-and-drop clone**, three read modes, **volume**, diagnostics |
 | `moss_tts_say` | Agent-initiated speech (plays locally, or `save_to` writes a WAV); cloned voices are detected automatically |
 | `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | Voices (labels + default marker) / stop / clone (trims >20 s) / status, install, restart, unload |
 
@@ -150,6 +150,8 @@ The weights are left in place (the CLI and the web playground still use them). D
 | Long replies are cut short | The auto-read limit (1500 chars) — raise it in settings, or use the reply's own read button |
 | It keeps ~250 MB resident | The engine is a resident child; it unloads after 10 idle minutes, or press "Stop (free memory)", or lower `idleUnloadMinutes` |
 | Smart summary is not used | Check the diagnostics JSON or `[summary]` in `plugin.log`; without the subagent service it degrades to `extract` |
+| Louder than other apps | Lower the "Volume" slider to 50–70% (default 60%); it applies to browser playback and tool playback |
+| A tool call never returns | 0.2.1 fixes the engine stdout stall after an aborted stream; update and restart DSH |
 | Thread changes do nothing | Press "Save and restart engine"; a stale value in `settings.json` is read back into the page first |
 | Plugin does not appear | DSH must be restarted; `dsh --profile desktop --dump-config` should contain a row `id: moss-tts` |
 

@@ -339,8 +339,11 @@ class StreamPlayer {
     const aligned = new Uint8Array(bytes.length)
     aligned.set(bytes)
     const ints = new Int16Array(aligned.buffer)
+    // 音量在浏览器这一侧乘：拖动滑块时，后续到的音频块立刻生效
+    const raw = Number(prefsStore.value?.volume)
+    const gain = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 1
     let floats = new Float32Array(ints.length)
-    for (let i = 0; i < ints.length; i++) floats[i] = ints[i] / 32768
+    for (let i = 0; i < ints.length; i++) floats[i] = (ints[i] / 32768) * gain
     if (this.resample) floats = this.resample(floats)
     this.sent += floats.length >> 1
     this.worklet.port.postMessage({ type: 'push', samples: floats }, [floats.buffer])

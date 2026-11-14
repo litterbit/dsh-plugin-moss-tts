@@ -6,6 +6,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { TtsService } from '../lib/host/service.mjs'
+import { scalePcm16 } from '../lib/host/engine.mjs'
 import { readEngineSettings, writeEngineSettings } from '../lib/host/settings.mjs'
 
 const ROOT = path.resolve('runs', 'test-service')
@@ -234,5 +235,49 @@ test('一次失败不会毒化队列：下一句照常合成', async () => {
   const job = await service.speak({ text: 'b', onAudio: () => {} })
   assert.equal((await job.done).state, 'completed')
   assert.equal(service.active, 0)
+  await service.dispose()
+})
+
+test('scalePcm16：按比例缩放并削顶，1.0 原样返回', () => {
+  const pcm = Buffer.alloc(8)
+  pcm.writeInt16LE(1000, 0)
+  pcm.writeInt16LE(-1000, 2)
+  pcm.writeInt16LE(30000, 4)
+  pcm.writeInt16LE(-30000, 6)
+  const half = scalePcm16(pcm, 0.5)
+  assert.equal(half.readInt16LE(0), 500)
+  assert.equal(half.readInt16LE(2), -500)
+  assert.equal(half.readInt16LE(4), 15000)
+  assert.equal(half.readInt16LE(6), -15000)
+  assert.equal(scalePcm16(pcm, 2).readInt16LE(0), 2000)
+  assert.equal(scalePcm16(pcm, 1), pcm)
+})
+
+test('工具落盘的 WAV 会按音量缩放', async () => {
+  const service = makeService(() => ({
+    exe: 'fake.exe',
+    models: 'fake-models',
+    running: false,
+    info: { version: '0.1.2', engine: {} },
+    async start() {
+      this.running = true
+      return this.info
+    },
+    async stop() {
+      this.running = false
+      return true
+    },
+    async speak(options) {
+      const samples = new Int16Array([1000, 1000])
+      options.onAudio(Buffer.from(samples.buffer))
+      return { id: 'x', done: Promise.resolve({ state: 'completed', audio_ms: 1 }), cancel: () => {} }
+    },
+    async dispose() {},
+  }))
+  service.prefs.update({ volume: 0.5 })
+  const file = path.join(ROOT, 'scaled.wav')
+  await service.synthesizeToFile({ text: 'x', voice: '', scope: 'builtin', file })
+  const wav = fs.readFileSync(file)
+  assert.equal(wav.readInt16LE(44), 500)
   await service.dispose()
 })

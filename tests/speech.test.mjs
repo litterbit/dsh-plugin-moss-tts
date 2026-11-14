@@ -76,6 +76,9 @@ test('normalizePrefs 只认已知字段并夹范围', () => {
   const bad = normalizePrefs({ voice: '', maxChars: 'abc' })
   assert.equal(bad.voice, DEFAULT_PREFS.voice)
   assert.equal(bad.maxChars, DEFAULT_PREFS.maxChars)
+  assert.equal(normalizePrefs({ volume: 3 }).volume, 1)
+  assert.equal(normalizePrefs({ volume: -1 }).volume, 0)
+  assert.equal(normalizePrefs({ volume: 0.555 }).volume, 0.56)
 })
 
 test('Prefs 落盘后能读回，坏文件退默认', () => {
