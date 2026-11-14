@@ -72,7 +72,7 @@ dsh plugin --profile <name> add github:litterbit/dsh-plugin-moss-tts#main
 | 输入框左侧 🔊 | 自动朗读开关。开着时，每条回复定稿后按所选模式念；再点（朗读中变 ⏹）立刻停 |
 | 每条回复的 🔊 | 只念这一条。默认念全文，不受"自动朗读上限"影响 |
 | 设置 → Moss 语音 | 引擎状态/线程/重启、默认音色、**试听台**（填文本逐个音色试）、**拖入音频克隆音色**、三种朗读模式、**音量**、诊断 |
-| 工具 `moss_tts_say` | agent 主动朗读（本机播放，或 `save_to` 只落盘）；克隆音色自动识别，不用再填 scope |
+| 工具 `moss_tts_say` | agent 主动朗读：合成完**开始播放就返回**（`wait=true` 才等播完），agent 可以边放边说别的；`save_to` 只落盘；克隆音色自动识别 |
 | 工具 `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | 音色列表（带中文名与默认标记）/ 停止 / 克隆（>20 秒自动裁剪）/ 状态、安装、重启、卸载 |
 
 朗读前会清洗 Markdown：代码块和表格不念，链接只念文字，标题与列表符号去掉，

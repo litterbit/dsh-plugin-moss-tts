@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.2 — 2026-11-14
+
+- **`moss_tts_engine` 报 "invalid output: value is not lossless JSON"**：`status()` 里天然有
+  `undefined`（没启动时的版本/线程/上次作业），宿主校验直接判失败。现在所有工具输出统一过
+  一遍 `jsonSafe`：剔掉 `undefined`、把非有限数变 `null`。
+- **`moss_tts_say` 不再卡住 agent**：合成完**启动播放就返回**（`background: true`），
+  agent 可以在语音播报的同时继续做事；需要等播完再传 `wait: true`。
+  同一时刻只保留一个播放器，新的一句会掐掉上一句；`moss_tts_stop` 会同时停合成与播放，
+  插件卸载时也会收掉播放器进程。
+- 合成本身仍然串行（引擎是单 worker），但工具调用不再被音频时长占住，多个调用可以并行发起。
+
 ## 0.2.1 — 2026-11-14
 
 0.2.0 在真机上暴露的三个问题：

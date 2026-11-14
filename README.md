@@ -70,7 +70,7 @@ release's `sha256sums.txt`, and extracts it into `%LOCALAPPDATA%\MossTTS`.
 | 🔊 left of the composer | Auto-read. Reads each reply when it settles, using the selected mode; while speaking the same button is ⏹ and stops it |
 | 🔊 on a reply | Reads that reply only (whole text, ignores the auto-read limit) |
 | Settings → Moss Speech | Engine state/threads/restart, default voice, **voice lab** (type text, preview any voice), **drag-and-drop clone**, three read modes, **volume**, diagnostics |
-| `moss_tts_say` | Agent-initiated speech (plays locally, or `save_to` writes a WAV); cloned voices are detected automatically |
+| `moss_tts_say` | Agent-initiated speech: returns as soon as playback starts (`wait: true` to block until it ends), so the agent can keep working; `save_to` only writes the WAV; cloned voices are detected automatically |
 | `moss_tts_voices` / `moss_tts_stop` / `moss_tts_clone` / `moss_tts_engine` | Voices (labels + default marker) / stop / clone (trims >20 s) / status, install, restart, unload |
 
 Markdown is cleaned before speaking: fenced code and tables are skipped, links keep their text,

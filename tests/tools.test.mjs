@@ -62,6 +62,22 @@ test('moss_tts_engine 在没装引擎时给出可执行文案', async () => {
   assert.match(voices.detail, /设置 → Moss 语音/u)
 })
 
+test('工具输出是 lossless JSON：整棵树里没有 undefined', async () => {
+  const ctx = fakeCtx()
+  apply(ctx, { root: ROOT, autoDownload: false })
+  const status = await ctx.tools_.get('moss_tts_engine').execute({ action: 'status' })
+  const walk = (value, path) => {
+    assert.notEqual(value, undefined, `${path} 是 undefined`)
+    if (!value || typeof value !== 'object') return
+    for (const [key, item] of Object.entries(value)) {
+      assert.notEqual(item, undefined, `${path}.${key} 是 undefined`)
+      walk(item, `${path}.${key}`)
+    }
+  }
+  walk(status, 'status')
+  assert.doesNotThrow(() => JSON.parse(JSON.stringify(status)))
+})
+
 function sampleOutput(name) {
   if (name === 'moss_tts_say') {
     return { voice: 'Junhao', seconds: 1.5, compute_ms: 200, rtf: 0.13, file: 'x.wav', played: true }
