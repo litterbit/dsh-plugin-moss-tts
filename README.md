@@ -1,6 +1,6 @@
 # dsh-plugin-moss-tts
 
-[简体中文](README.zh-CN.md) · Version **0.2.4** · Apache-2.0 · [Engine repo](https://github.com/litterbit/dsh-moss-tts)
+[简体中文](README.zh-CN.md) · Version **0.2.5** · Apache-2.0 · [Engine repo](https://github.com/litterbit/dsh-moss-tts)
 
 Local text-to-speech for DeepSeek Harness, powered by the MOSS-TTS-Nano-100M C++ CPU engine.
 Everything is synthesized on this machine; text never leaves it, and the weights are installed

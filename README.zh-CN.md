@@ -1,6 +1,6 @@
 # dsh-plugin-moss-tts
 
-[English](README.md) · 版本 **0.2.4** · Apache-2.0 · [引擎仓](https://github.com/litterbit/dsh-moss-tts)
+[English](README.md) · 版本 **0.2.5** · Apache-2.0 · [引擎仓](https://github.com/litterbit/dsh-moss-tts)
 
 给 DeepSeek Harness 用的**本地 TTS**插件：用 MOSS-TTS-Nano-100M 的 C++ CPU 引擎朗读助手回复。
 全部在本机计算，文本不出机器；权重只装一份，和命令行、网页试听台共用。
