@@ -80,6 +80,32 @@ test('工具输出是 lossless JSON：整棵树里没有 undefined', async () =>
   assert.doesNotThrow(() => JSON.parse(JSON.stringify(status)))
 })
 
+test('引擎状态里的 undefined / NaN / Infinity 一律变成合法 JSON', async () => {
+  // 真机现场：models/manifest.json 只有 min_engine_version、没有 version，
+  // 引擎没起时 status() 的 version / engineVersion 就是 undefined。
+  const tools = registerFakeTools(
+    sayService({
+      status: () => ({
+        state: 'ready',
+        version: undefined,
+        engineVersion: undefined,
+        rtf: NaN,
+        idle: Infinity,
+        nested: { missing: undefined, values: [1, undefined, NaN] },
+      }),
+    }),
+    {},
+  )
+  const out = await tools.get('moss_tts_engine').execute({ action: 'status' })
+  assert.deepEqual(out, {
+    state: 'ready',
+    rtf: null,
+    idle: null,
+    nested: { values: [1, null] },
+  })
+  assert.doesNotThrow(() => JSON.parse(JSON.stringify(out)))
+})
+
 function sampleOutput(name) {
   if (name === 'moss_tts_say') {
     return { voice: 'Junhao', seconds: 1.5, compute_ms: 200, rtf: 0.13, file: 'x.wav', played: true }

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.4 — 2026-11-18
+
+只修“装上了却像没装”的加载期问题，功能与 0.2.3 相同。
+
+- **设置页 404 / 路由时有时无**：`webServer` 比插件晚就绪时，旧逻辑看一眼就放弃，
+  一条路由都不挂。现在用 `ctx.inject(['webServer'])` 等它上线再挂，服务消失时用
+  `ctx.effect` 自动注销；注册到一半撞上重复路由，会先把已挂的半套拆掉再抛。
+- **`moss_tts_engine status` 报 value is not lossless JSON**：`status()` 里的
+  `version` / `engineVersion` 在“引擎没装 / manifest 没有 version”时是 `undefined`。
+  现在源头就落成 `null`，工具出口的 `jsonSafe` 继续兜底（0.2.2 起的第二道）。
+- **`apply` 绝不再返回对象**：cordis 把返回值当 effect，普通对象直接抛
+  `Invalid effect`，整个插件的 fiber 连同刚注册的路由一起被拆（0.1.0 的写法）。
+- 新增 `tests/lifecycle.test.mjs`：假 ctx 复刻 cordis 的 inject/effect 语义，覆盖
+  “webServer 后到”“已就绪”“注册中途失败”“apply 返回 undefined”；另外用从 DSH
+  `app.asar` 里取出的真 cordis 4.0.5 跑过同一组断言（`runs/cordis-probe/`）。
+
 ## 0.2.3 — 2026-11-14
 
 两件事：**播放停不下来**，和**说一句话要等整段合成完**。

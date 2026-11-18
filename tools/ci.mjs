@@ -21,6 +21,7 @@ const steps = [
       'tests/clone-audio.test.mjs',
       'tests/tools.test.mjs',
       'tests/playback.test.mjs',
+      'tests/lifecycle.test.mjs',
     ],
   ],
   ['客户端 bundle 可加载', ['--test', 'tests/client-load.test.mjs']],
